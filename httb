@@ -1,1 +1,89 @@
-#
+# 🎮 Controller Calibration Tool
+
+### جهاز معايرة الأيادي — PlayStation & Xbox
+
+![HTML](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![No Dependencies](https://img.shields.io/badge/Dependencies-None-brightgreen?style=for-the-badge)
+
+-----
+
+## ✨ المميزات | Features
+
+- 🕹️ **دعم كامل** لأيادي PlayStation و Xbox (كل الإصدارات)
+- 📡 **Gamepad API** — كشف تلقائي عند توصيل الأيدي
+- 🎯 **معايرة العصا** مع تحكم كامل في Deadzone والحساسية
+- 📊 **منحنيات الحساسية** — Linear، Exponential، S-Curve، Steep
+- 💥 **اختبار الاهتزاز** بأنواع مختلفة
+- 🔘 **اختبار جميع الأزرار** (أزرار الوجه، D-Pad، Triggers)
+- 🖥️ **وضع يدوي** للمحاكاة بالماوس بدون جهاز
+- ⚡ **لا يحتاج مكتبات خارجية** — ملف HTML واحد فقط
+
+-----
+
+## 🚀 طريقة الاستخدام | How to Use
+
+### الطريقة 1 — مباشرة من GitHub Pages
+
+```
+افتح الرابط بعد تفعيل GitHub Pages
+```
+
+### الطريقة 2 — تشغيل محلي
+
+```bash
+git clone https://github.com/YOUR_USERNAME/controller-calibration
+cd controller-calibration
+# افتح controller-calibration.html في المتصفح
+```
+
+-----
+
+## 🎮 الأجهزة المدعومة | Supported Controllers
+
+|PlayStation        |Xbox            |
+|-------------------|----------------|
+|PS5 DualSense      |Xbox Series X/S |
+|PS4 DualShock 4    |Xbox One        |
+|PS3 DualShock 3    |Xbox 360        |
+|PlayStation Classic|Elite Controller|
+
+-----
+
+## 🌐 المتصفحات المدعومة | Browser Support
+
+|المتصفح      |الدعم |
+|-------------|------|
+|Chrome / Edge|✅ كامل|
+|Firefox      |✅ كامل|
+|Safari       |⚠️ جزئي|
+
+
+> **ملاحظة:** يتطلب Gamepad API — تأكد من إذن المتصفح
+
+-----
+
+## 📁 هيكل المشروع | Project Structure
+
+```
+controller-calibration/
+├── controller-calibration.html   ← التطبيق الكامل
+├── README.md                     ← هذا الملف
+└── LICENSE                       ← رخصة MIT
+```
+
+-----
+
+## 🔧 GitHub Pages — تفعيل سريع
+
+1. ارفع الملفات على GitHub
+1. اذهب إلى **Settings → Pages**
+1. اختر **Branch: main** → **/ (root)**
+1. احفظ — الموقع سيكون جاهز خلال دقيقة!
+
+-----
+
+## 📄 License
+
+MIT License — استخدم حر ✓
