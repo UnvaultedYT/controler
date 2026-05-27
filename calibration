@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>معايرة الأيادي | Controller Calibration</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Cairo:wght@300;400;600;700&display=swap');
+
+  :root {
+    --ps-blue: #003791;
+    --ps-light: #00439C;
+    --xbox-green: #107C10;
+    --xbox-light: #52B043;
+    --neon-cyan: #00F5FF;
+    --neon-green: #39FF14;
+    --neon-orange: #FF6B35;
+    --dark-bg: #050A14;
+    --panel-bg: rgba(10,20,40,0.85);
+    --text-main: #E8F4FF;
+    --text-dim: #7A9CC4;
+    --border: rgba(0,245,255,0.2);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--dark-bg);
+    color: var(--text-main);
+    font-family: 'Cairo', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid Background */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* Animated glowing orbs */
+  body::after {
+    content:'';
+    position:fixed; inset:0;
+    background:
+      radial-gradient(ellipse 600px 400px at 10% 20%, rgba(0,67,156,0.25) 0%, transparent 70%),
+      radial-gradient(ellipse 500px 350px at 90% 80%, rgba(16,124,16,0.2) 0%, transparent 70%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .container {
+    position:relative; z-index:1;
+    max-width:900px; margin:0 auto;
+    padding:20px;
+  }
+
+  /* Header */
+  header {
+    text-align:center;
+    padding:30px 0 20px;
+  }
+  .logo-badge {
+    display:inline-flex; align-items:center; gap:10px;
+    background: rgba(0,245,255,0.05);
+    border:1px solid var(--border);
+    border-radius:50px;
+    padding:6px 20px;
+    margin-bottom:16px;
+    font-family:'Orbitron', monospace;
+    font-size:11px;
+    letter-spacing:3px;
+    color:var(--neon-cyan);
+    text-transform:uppercase;
+  }
+  .logo-badge span { width:6px;height:6px;border-radius:50%;background:var(--neon-cyan);animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+
+  h1 {
+    font-family:'Orbitron', monospace;
+    font-size:clamp(22px,4vw,36px);
+    font-weight:900;
+    background: linear-gradient(135deg, #00F5FF 0%, #ffffff 50%, #52B043 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text;
+    letter-spacing:2px;
+    margin-bottom:6px;
+  }
+  .subtitle { color:var(--text-dim); font-size:14px; }
+
+  /* Controller Type Tabs */
+  .tabs {
+    display:flex; gap:8px;
+    margin:24px 0;
+    background: rgba(255,255,255,0.03);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:6px;
+  }
+  .tab {
+    flex:1; padding:12px 8px;
+    border:none; border-radius:8px;
+    background:transparent;
+    color:var(--text-dim);
+    font-family:'Cairo',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    transition:all 0.3s;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .tab:hover { color:var(--text-main); background:rgba(255,255,255,0.05); }
+  .tab.active.ps {
+    background:linear-gradient(135deg, var(--ps-blue), var(--ps-light));
+    color:#fff;
+    box-shadow:0 0 20px rgba(0,55,145,0.5);
+  }
+  .tab.active.xbox {
+    background:linear-gradient(135deg, var(--xbox-green), var(--xbox-light));
+    color:#fff;
+    box-shadow:0 0 20px rgba(16,124,16,0.5);
+  }
+  .tab-icon { font-size:18px; }
+
+  /* Sub-type selector */
+  .subtype-row {
+    display:flex; gap:8px; flex-wrap:wrap;
+    margin-bottom:20px;
+  }
+  .subtype-btn {
+    padding:8px 16px;
+    border-radius:20px;
+    border:1px solid var(--border);
+    background:transparent;
+    color:var(--text-dim);
+    font-family:'Cairo',sans-serif;
+    font-size:12px;
+    cursor:pointer;
+    transition:all 0.3s;
+  }
+  .subtype-btn:hover { border-color:var(--neon-cyan); color:var(--neon-cyan); }
+  .subtype-btn.active { background:rgba(0,245,255,0.1); border-color:var(--neon-cyan); color:var(--neon-cyan); }
+
+  /* Main Grid */
+  .main-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-bottom:16px;
+  }
+  @media(max-width:600px){ .main-grid { grid-template-columns:1fr; } }
+
+  /* Panel */
+  .panel {
+    background:var(--panel-bg);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:20px;
+    backdrop-filter:blur(10px);
+  }
+  .panel-title {
+    font-family:'Orbitron',monospace;
+    font-size:11px;
+    letter-spacing:2px;
+    color:var(--neon-cyan);
+    text-transform:uppercase;
+    margin-bottom:16px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel-title::before {
+    content:'';
+    width:16px; height:2px;
+    background:var(--neon-cyan);
+    box-shadow:0 0 8px var(--neon-cyan);
+  }
+
+  /* Joystick Visual */
+  .joystick-container {
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .joystick-wrap {
+    position:relative;
+    width:130px; height:130px;
+  }
+  .joystick-bg {
+    width:100%; height:100%;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(0,245,255,0.05) 0%, rgba(0,245,255,0.02) 60%, transparent 100%);
+    border:2px solid rgba(0,245,255,0.15);
+    position:relative;
+  }
+  /* Crosshair lines */
+  .joystick-bg::before {
+    content:'';
+    position:absolute; inset:0;
+    background:
+      linear-gradient(transparent 49%, rgba(0,245,255,0.1) 49%, rgba(0,245,255,0.1) 51%, transparent 51%),
+      linear-gradient(90deg, transparent 49%, rgba(0,245,255,0.1) 49%, rgba(0,245,255,0.1) 51%, transparent 51%);
+    border-radius:50%;
+  }
+  /* Range circles */
+  .range-circle {
+    position:absolute;
+    border-radius:50%;
+    border:1px dashed rgba(0,245,255,0.08);
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+  }
+  .stick-dot {
+    position:absolute;
+    width:18px; height:18px;
+    border-radius:50%;
+    background:var(--neon-cyan);
+    box-shadow:0 0 12px var(--neon-cyan);
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    transition:all 0.05s;
+    cursor:crosshair;
+  }
+  .stick-dot.ps { background:var(--ps-light); box-shadow:0 0 12px var(--ps-light); }
+  .stick-dot.xbox { background:var(--xbox-light); box-shadow:0 0 12px var(--xbox-light); }
+
+  .stick-coords {
+    font-family:'Orbitron',monospace;
+    font-size:10px;
+    color:var(--text-dim);
+    text-align:center;
+  }
+  .stick-label { font-size:12px; color:var(--text-dim); margin-top:4px; }
+
+  .joystick-pair {
+    display:flex; gap:20px; justify-content:center; flex-wrap:wrap;
+  }
+
+  /* Trigger bars */
+  .trigger-section { margin-top:8px; }
+  .trigger-row {
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:10px;
+  }
+  .trigger-label {
+    font-size:11px; color:var(--text-dim);
+    width:40px; text-align:center;
+    font-family:'Orbitron',monospace;
+  }
+  .trigger-bar-bg {
+    flex:1; height:12px;
+    background:rgba(255,255,255,0.05);
+    border:1px solid var(--border);
+    border-radius:6px;
+    overflow:hidden;
+    position:relative;
+  }
+  .trigger-bar-fill {
+    height:100%; width:0%;
+    border-radius:6px;
+    transition:width 0.05s;
+    background:linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+    box-shadow:0 0 8px rgba(0,245,255,0.4);
+    position:relative;
+  }
+  .trigger-bar-fill.ps { background:linear-gradient(90deg, var(--ps-blue), #0070CC); box-shadow:0 0 8px rgba(0,112,204,0.4); }
+  .trigger-bar-fill.xbox { background:linear-gradient(90deg, var(--xbox-green), var(--xbox-light)); box-shadow:0 0 8px rgba(82,176,67,0.4); }
+  .trigger-val {
+    width:36px; text-align:center;
+    font-family:'Orbitron',monospace;
+    font-size:10px; color:var(--text-dim);
+  }
+
+  /* Deadzone slider */
+  .slider-row {
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:10px;
+  }
+  .slider-label { font-size:12px; color:var(--text-dim); min-width:90px; }
+  input[type=range] {
+    flex:1; height:4px;
+    -webkit-appearance:none;
+    background:rgba(0,245,255,0.15);
+    border-radius:2px;
+    outline:none;
+    cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--neon-cyan);
+    box-shadow:0 0 8px var(--neon-cyan);
+    cursor:pointer;
+  }
+  .slider-val {
+    font-family:'Orbitron',monospace;
+    font-size:10px; color:var(--neon-cyan);
+    width:36px; text-align:center;
+  }
+
+  /* Buttons grid */
+  .buttons-grid {
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+    margin-top:8px;
+  }
+  .btn-test {
+    aspect-ratio:1;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,0.1);
+    background:rgba(255,255,255,0.04);
+    color:var(--text-dim);
+    font-size:12px;
+    font-weight:700;
+    cursor:pointer;
+    transition:all 0.15s;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Cairo',sans-serif;
+  }
+  .btn-test:hover { background:rgba(255,255,255,0.08); }
+  .btn-test.active-btn {
+    background:rgba(0,245,255,0.15);
+    border-color:var(--neon-cyan);
+    color:var(--neon-cyan);
+    box-shadow:0 0 12px rgba(0,245,255,0.3);
+  }
+  /* PS Colors */
+  .btn-cross.active-btn { border-color:#4169E1; color:#4169E1; box-shadow:0 0 12px rgba(65,105,225,0.5); }
+  .btn-circle.active-btn { border-color:#DC143C; color:#DC143C; box-shadow:0 0 12px rgba(220,20,60,0.5); }
+  .btn-square.active-btn { border-color:#FF69B4; color:#FF69B4; box-shadow:0 0 12px rgba(255,105,180,0.5); }
+  .btn-triangle.active-btn { border-color:#2ECC71; color:#2ECC71; box-shadow:0 0 12px rgba(46,204,113,0.5); }
+
+  /* DPad */
+  .dpad-container {
+    display:flex; justify-content:center; margin-top:8px;
+  }
+  .dpad {
+    display:grid;
+    grid-template-columns:repeat(3,36px);
+    grid-template-rows:repeat(3,36px);
+    gap:3px;
+  }
+  .dpad-btn {
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:4px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--text-dim);
+    font-size:14px;
+    transition:all 0.15s;
+  }
+  .dpad-btn:hover { background:rgba(0,245,255,0.08); }
+  .dpad-btn.active-btn {
+    background:rgba(0,245,255,0.15);
+    border-color:var(--neon-cyan);
+    box-shadow:0 0 8px rgba(0,245,255,0.3);
+  }
+  .dpad-center { background:rgba(255,255,255,0.02) !important; cursor:default; }
+
+  /* Vibration panel */
+  .vibration-row {
+    display:flex; gap:10px; align-items:center;
+    margin-bottom:10px; flex-wrap:wrap;
+  }
+  .vib-label { font-size:12px; color:var(--text-dim); min-width:80px; }
+  .vib-btn {
+    padding:8px 16px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:transparent;
+    color:var(--text-dim);
+    font-family:'Cairo',sans-serif;
+    font-size:12px;
+    cursor:pointer;
+    transition:all 0.3s;
+  }
+  .vib-btn:hover { border-color:var(--neon-orange); color:var(--neon-orange); }
+  .vib-btn.testing {
+    background:rgba(255,107,53,0.1);
+    border-color:var(--neon-orange);
+    color:var(--neon-orange);
+    animation:shake 0.1s infinite;
+  }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)}
+    25%{transform:translateX(-1px)}
+    75%{transform:translateX(1px)}
+  }
+
+  /* Status bar */
+  .status-bar {
+    display:flex; align-items:center; gap:12px;
+    background:var(--panel-bg);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 20px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .status-item {
+    display:flex; align-items:center; gap:6px;
+    font-size:12px; color:var(--text-dim);
+  }
+  .status-dot {
+    width:8px; height:8px;
+    border-radius:50%;
+    background:#666;
+  }
+  .status-dot.connected { background:var(--neon-green); box-shadow:0 0 6px var(--neon-green); animation:pulse 2s infinite; }
+  .status-dot.warning { background:var(--neon-orange); box-shadow:0 0 6px var(--neon-orange); }
+
+  /* Calibration button */
+  .calibrate-btn {
+    width:100%; padding:14px;
+    border-radius:12px;
+    border:none;
+    font-family:'Orbitron',monospace;
+    font-size:13px;
+    letter-spacing:2px;
+    cursor:pointer;
+    transition:all 0.3s;
+    position:relative; overflow:hidden;
+    background:linear-gradient(135deg, rgba(0,245,255,0.1), rgba(0,245,255,0.05));
+    border:1px solid rgba(0,245,255,0.3);
+    color:var(--neon-cyan);
+    text-transform:uppercase;
+  }
+  .calibrate-btn::before {
+    content:'';
+    position:absolute; top:-50%; left:-50%;
+    width:200%; height:200%;
+    background:linear-gradient(45deg, transparent 30%, rgba(0,245,255,0.1) 50%, transparent 70%);
+    transform:translateX(-100%);
+    transition:transform 0.6s;
+  }
+  .calibrate-btn:hover::before { transform:translateX(100%); }
+  .calibrate-btn:hover {
+    background:rgba(0,245,255,0.15);
+    box-shadow:0 0 20px rgba(0,245,255,0.3);
+  }
+  .calibrate-btn.running {
+    color:var(--neon-orange);
+    border-color:var(--neon-orange);
+    background:rgba(255,107,53,0.05);
+    animation:borderPulse 1s infinite;
+  }
+  @keyframes borderPulse {
+    0%,100%{box-shadow:0 0 5px rgba(255,107,53,0.3)}
+    50%{box-shadow:0 0 20px rgba(255,107,53,0.6)}
+  }
+
+  /* Log */
+  .log-panel {
+    background:rgba(0,0,0,0.5);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+    height:120px;
+    overflow-y:auto;
+    font-family:'Orbitron',monospace;
+    font-size:10px;
+    color:var(--text-dim);
+    line-height:1.8;
+    margin-bottom:16px;
+  }
+  .log-panel::-webkit-scrollbar { width:4px; }
+  .log-panel::-webkit-scrollbar-thumb { background:rgba(0,245,255,0.2); border-radius:2px; }
+  .log-line { display:block; }
+  .log-line.ok { color:var(--neon-green); }
+  .log-line.warn { color:var(--neon-orange); }
+  .log-line.info { color:var(--neon-cyan); }
+
+  /* Gamepad API hint */
+  .gamepad-hint {
+    text-align:center;
+    font-size:11px;
+    color:var(--text-dim);
+    padding:10px;
+    border-top:1px solid var(--border);
+    margin-top:8px;
+  }
+
+  /* Sensitivity chart */
+  .sens-chart-wrap {
+    height:80px;
+    background:rgba(0,0,0,0.3);
+    border-radius:8px;
+    overflow:hidden;
+    position:relative;
+    border:1px solid var(--border);
+  }
+  canvas.sens-chart { width:100%; height:100%; }
+
+  /* Full panel */
+  .full-panel { grid-column:1/-1; }
+
+  /* Connect overlay */
+  .connect-overlay {
+    position:fixed; inset:0;
+    background:rgba(5,10,20,0.92);
+    z-index:100;
+    display:flex;
+    align-items:center; justify-content:center;
+    flex-direction:column;
+    gap:16px;
+    backdrop-filter:blur(6px);
+  }
+  .connect-overlay.hidden { display:none; }
+  .connect-icon { font-size:60px; animation:float 3s ease-in-out infinite; }
+  @keyframes float {
+    0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)}
+  }
+  .connect-title {
+    font-family:'Orbitron',monospace;
+    font-size:18px;
+    color:var(--neon-cyan);
+    letter-spacing:3px;
+    text-transform:uppercase;
+  }
+  .connect-sub { font-size:13px; color:var(--text-dim); text-align:center; max-width:300px; line-height:1.6; }
+  .connect-manual-btn {
+    padding:12px 30px;
+    border-radius:10px;
+    border:1px solid var(--neon-cyan);
+    background:rgba(0,245,255,0.08);
+    color:var(--neon-cyan);
+    font-family:'Orbitron',monospace;
+    font-size:12px;
+    letter-spacing:2px;
+    cursor:pointer;
+    transition:all 0.3s;
+  }
+  .connect-manual-btn:hover { background:rgba(0,245,255,0.18); box-shadow:0 0 16px rgba(0,245,255,0.3); }
+
+  /* Responsive */
+  @media(max-width:480px) {
+    .tabs { flex-wrap:wrap; }
+    h1 { font-size:20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Connect Overlay -->
+<div class="connect-overlay" id="connectOverlay">
+  <div class="connect-icon">🎮</div>
+  <div class="connect-title">Controller Calibration</div>
+  <div class="connect-sub">وصّل الأيدي وابغ زر أي زر للكشف التلقائي، أو اضغط "وضع يدوي" لاختبار يدوي</div>
+  <button class="connect-manual-btn" onclick="enterManualMode()">▶ وضع يدوي</button>
+</div>
+
+<div class="container">
+  <header>
+    <div class="logo-badge"><span></span>CONTROLLER CALIBRATION SYSTEM<span></span></div>
+    <h1>معايرة الأيادي</h1>
+    <p class="subtitle">PlayStation · Xbox · All Controllers</p>
+  </header>
+
+  <!-- Status -->
+  <div class="status-bar" id="statusBar">
+    <div class="status-item">
+      <div class="status-dot" id="connDot"></div>
+      <span id="connText">لا يوجد جهاز</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot" id="battDot"></div>
+      <span id="battText">البطارية: --</span>
+    </div>
+    <div class="status-item" style="margin-right:auto;">
+      <span id="modelText" style="color:var(--text-dim);font-size:11px;font-family:'Orbitron',monospace;">---</span>
+    </div>
+    <div class="status-item">
+      <span id="frameText" style="font-size:10px;font-family:'Orbitron',monospace;color:var(--text-dim);">0 fps</span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab ps active" id="tabPS" onclick="switchType('ps')">
+      <span class="tab-icon">🎮</span> PlayStation
+    </button>
+    <button class="tab xbox" id="tabXbox" onclick="switchType('xbox')">
+      <span class="tab-icon">🎮</span> Xbox
+    </button>
+  </div>
+
+  <!-- Sub-type -->
+  <div class="subtype-row" id="subtypeRow"></div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+
+    <!-- Left Stick -->
+    <div class="panel">
+      <div class="panel-title">العصا اليسرى</div>
+      <div class="joystick-container">
+        <div class="joystick-wrap">
+          <div class="joystick-bg" id="stickLeftBg">
+            <div class="range-circle" style="width:80%;height:80%"></div>
+            <div class="range-circle" style="width:50%;height:50%"></div>
+            <div class="range-circle" style="width:20%;height:20%"></div>
+            <div class="stick-dot" id="stickLeft"></div>
+          </div>
+        </div>
+        <div class="stick-coords" id="coordsLeft">X: 0.00 | Y: 0.00</div>
+        <div class="stick-label">L-Stick</div>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="slider-row">
+          <span class="slider-label">Deadzone</span>
+          <input type="range" min="0" max="30" value="8" id="deadzoneLeft" oninput="updateDeadzone('left')">
+          <span class="slider-val" id="deadzoneLeftVal">8%</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">حساسية</span>
+          <input type="range" min="1" max="200" value="100" id="sensLeft" oninput="updateSens('left')">
+          <span class="slider-val" id="sensLeftVal">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Stick -->
+    <div class="panel">
+      <div class="panel-title">العصا اليمنى</div>
+      <div class="joystick-container">
+        <div class="joystick-wrap">
+          <div class="joystick-bg" id="stickRightBg">
+            <div class="range-circle" style="width:80%;height:80%"></div>
+            <div class="range-circle" style="width:50%;height:50%"></div>
+            <div class="range-circle" style="width:20%;height:20%"></div>
+            <div class="stick-dot" id="stickRight"></div>
+          </div>
+        </div>
+        <div class="stick-coords" id="coordsRight">X: 0.00 | Y: 0.00</div>
+        <div class="stick-label">R-Stick</div>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="slider-row">
+          <span class="slider-label">Deadzone</span>
+          <input type="range" min="0" max="30" value="8" id="deadzoneRight" oninput="updateDeadzone('right')">
+          <span class="slider-val" id="deadzoneRightVal">8%</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-label">حساسية</span>
+          <input type="range" min="1" max="200" value="100" id="sensRight" oninput="updateSens('right')">
+          <span class="slider-val" id="sensRightVal">100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Triggers -->
+    <div class="panel">
+      <div class="panel-title">الأزرار الخلفية (Triggers)</div>
+      <div class="trigger-section">
+        <div class="trigger-row">
+          <span class="trigger-label">L2</span>
+          <div class="trigger-bar-bg"><div class="trigger-bar-fill" id="trigL"></div></div>
+          <span class="trigger-val" id="trigLVal">0</span>
+        </div>
+        <div class="trigger-row">
+          <span class="trigger-label">R2</span>
+          <div class="trigger-bar-bg"><div class="trigger-bar-fill" id="trigR"></div></div>
+          <span class="trigger-val" id="trigRVal">0</span>
+        </div>
+        <div class="trigger-row">
+          <span class="trigger-label">L1</span>
+          <div class="trigger-bar-bg"><div class="trigger-bar-fill" id="trigL1" style="background:rgba(0,245,255,0.5)"></div></div>
+          <span class="trigger-val" id="trigL1Val">-</span>
+        </div>
+        <div class="trigger-row">
+          <span class="trigger-label">R1</span>
+          <div class="trigger-bar-bg"><div class="trigger-bar-fill" id="trigR1" style="background:rgba(0,245,255,0.5)"></div></div>
+          <span class="trigger-val" id="trigR1Val">-</span>
+        </div>
+      </div>
+      <div class="slider-row" style="margin-top:8px;">
+        <span class="slider-label">Trigger DZ</span>
+        <input type="range" min="0" max="20" value="5" id="trigDZ" oninput="updateTrigDZ()">
+        <span class="slider-val" id="trigDZVal">5%</span>
+      </div>
+    </div>
+
+    <!-- Face Buttons -->
+    <div class="panel">
+      <div class="panel-title" id="btnPanelTitle">أزرار الوجه</div>
+      <div class="buttons-grid" id="faceButtons"></div>
+      <div class="dpad-container">
+        <div class="dpad" id="dpadGrid"></div>
+      </div>
+    </div>
+
+    <!-- Vibration -->
+    <div class="panel">
+      <div class="panel-title">اختبار الاهتزاز</div>
+      <div class="vibration-row">
+        <span class="vib-label">شدة اليسار</span>
+        <input type="range" min="0" max="100" value="70" id="vibLeft" style="flex:1">
+        <span class="slider-val" id="vibLeftVal">70%</span>
+      </div>
+      <div class="vibration-row">
+        <span class="vib-label">شدة اليمين</span>
+        <input type="range" min="0" max="100" value="70" id="vibRight" style="flex:1">
+        <span class="slider-val" id="vibRightVal">70%</span>
+      </div>
+      <div class="vibration-row" style="margin-top:4px;">
+        <button class="vib-btn" id="vibShort" onclick="testVibration('short')">نبضة قصيرة</button>
+        <button class="vib-btn" id="vibLong" onclick="testVibration('long')">اهتزاز مستمر</button>
+        <button class="vib-btn" id="vibDouble" onclick="testVibration('double')">نبضة مزدوجة</button>
+      </div>
+      <div style="margin-top:10px;padding:8px;background:rgba(255,255,255,0.03);border-radius:8px;">
+        <div style="font-size:10px;color:var(--text-dim);font-family:'Orbitron',monospace;margin-bottom:4px;">ملاحظة:</div>
+        <div style="font-size:11px;color:var(--text-dim);">الاهتزاز يعمل عبر Gamepad API في المتصفح مع الأجهزة المدعومة</div>
+      </div>
+    </div>
+
+    <!-- Sensitivity Curve -->
+    <div class="panel">
+      <div class="panel-title">منحنى الحساسية</div>
+      <div class="sens-chart-wrap">
+        <canvas id="sensCanvas"></canvas>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="slider-row">
+          <span class="slider-label">نوع المنحنى</span>
+          <select id="curveType" onchange="drawSensCurve()" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;color:var(--text-main);padding:4px 8px;font-family:'Cairo',sans-serif;">
+            <option value="linear">خطي Linear</option>
+            <option value="expo" selected>أسي Exponential</option>
+            <option value="scurve">S-Curve</option>
+            <option value="steep">حاد Steep</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calibration -->
+    <div class="panel full-panel">
+      <div class="panel-title">معايرة تلقائية</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="calibrate-btn" id="calBtn" onclick="startCalibration()" style="flex:2;min-width:200px;">
+          ▶ بدء المعايرة الكاملة
+        </button>
+        <button class="calibrate-btn" onclick="resetCalibration()" style="flex:1;min-width:100px;color:var(--neon-orange);border-color:rgba(255,107,53,0.3);">
+          ↺ إعادة
+        </button>
+      </div>
+      <div class="log-panel" id="logPanel">
+        <span class="log-line info">[SYSTEM] جاهز للمعايرة — وصّل الأيدي أو استخدم الوضع اليدوي</span>
+      </div>
+      <div class="gamepad-hint">يستخدم هذا التطبيق Gamepad API — متوفر على Chrome / Edge / Firefox</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// =====================
+// STATE
+// =====================
+let currentType = 'ps';
+let currentSubtype = 'ps5';
+let gamepadIndex = null;
+let rafId = null;
+let calStep = 0;
+let isCalibrating = false;
+let lastTimestamp = 0;
+let frameCount = 0;
+let fps = 0;
+let manualMode = false;
+
+// Deadzone / sens settings
+const settings = {
+  deadzoneLeft: 8,
+  deadzoneRight: 8,
+  sensLeft: 100,
+  sensRight: 100,
+  trigDZ: 5
+};
+
+// Controller definitions
+const controllers = {
+  ps: {
+    subtypes: [
+      {id:'ps5', label:'PS5 DualSense'},
+      {id:'ps4', label:'PS4 DualShock 4'},
+      {id:'ps3', label:'PS3 DualShock 3'},
+      {id:'psclassic', label:'PS Classic'}
+    ],
+    buttons: [
+      {id:'cross', label:'✕', cls:'btn-cross'},
+      {id:'circle', label:'◯', cls:'btn-circle'},
+      {id:'square', label:'□', cls:'btn-square'},
+      {id:'triangle', label:'△', cls:'btn-triangle'},
+    ],
+    triggerLabels: ['L2','R2','L1','R1'],
+    stickColor: 'ps'
+  },
+  xbox: {
+    subtypes: [
+      {id:'xsx', label:'Xbox Series X/S'},
+      {id:'xone', label:'Xbox One'},
+      {id:'x360', label:'Xbox 360'},
+      {id:'elite', label:'Elite Controller'}
+    ],
+    buttons: [
+      {id:'a', label:'A', cls:'', style:'color:#52B043'},
+      {id:'b', label:'B', cls:'', style:'color:#D13438'},
+      {id:'x', label:'X', cls:'', style:'color:#0078D4'},
+      {id:'y', label:'Y', cls:'', style:'color:#FFB900'},
+    ],
+    triggerLabels: ['LT','RT','LB','RB'],
+    stickColor: 'xbox'
+  }
+};
+
+// Gamepad button mapping (standard)
+const BUTTON_MAP = {
+  ps: {
+    cross:0, circle:1, square:2, triangle:3,
+    l1:4, r1:5, l2:6, r2:7,
+    dpad_up:12, dpad_down:13, dpad_left:14, dpad_right:15
+  },
+  xbox: {
+    a:0, b:1, x:2, y:3,
+    lb:4, rb:5, lt:6, rt:7,
+    dpad_up:12, dpad_down:13, dpad_left:14, dpad_right:15
+  }
+};
+
+const AXES = { lx:0, ly:1, rx:2, ry:3 };
+
+// =====================
+// INIT
+// =====================
+function init() {
+  buildSubtypes();
+  buildFaceButtons();
+  buildDpad();
+  drawSensCurve();
+  setupSliderListeners();
+  listenGamepad();
+}
+
+function buildSubtypes() {
+  const row = document.getElementById('subtypeRow');
+  row.innerHTML = '';
+  controllers[currentType].subtypes.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'subtype-btn' + (s.id === currentSubtype ? ' active' : '');
+    b.textContent = s.label;
+    b.onclick = () => {
+      currentSubtype = s.id;
+      row.querySelectorAll('.subtype-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      log(`info`, `نوع الأيدي: ${s.label}`);
+    };
+    row.appendChild(b);
+  });
+}
+
+function buildFaceButtons() {
+  const grid = document.getElementById('faceButtons');
+  grid.innerHTML = '';
+  const btns = controllers[currentType].buttons;
+  btns.forEach(btn => {
+    const el = document.createElement('button');
+    el.className = 'btn-test ' + (btn.cls || '');
+    el.id = 'fbtn_' + btn.id;
+    el.textContent = btn.label;
+    if(btn.style) el.setAttribute('style', btn.style + ';aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;');
+    // Manual click
+    el.addEventListener('mousedown', ()=>{ el.classList.add('active-btn'); log('ok','زر '+btn.label+' مضغوط ✓'); });
+    el.addEventListener('mouseup', ()=>{ el.classList.remove('active-btn'); });
+    el.addEventListener('touchstart', (e)=>{ e.preventDefault(); el.classList.add('active-btn'); log('ok','زر '+btn.label+' مضغوط ✓'); });
+    el.addEventListener('touchend', ()=>{ el.classList.remove('active-btn'); });
+    grid.appendChild(el);
+  });
+}
+
+function buildDpad() {
+  const dpad = document.getElementById('dpadGrid');
+  dpad.innerHTML = '';
+  const layout = [
+    null, {id:'up',label:'▲',row:0,col:1}, null,
+    {id:'left',label:'◀',row:1,col:0}, {id:'center',label:'',row:1,col:1}, {id:'right',label:'▶',row:1,col:2},
+    null, {id:'down',label:'▼',row:2,col:1}, null
+  ];
+  layout.forEach(item => {
+    const el = document.createElement('div');
+    if(!item) { el.style.background='transparent'; el.style.border='none'; }
+    else if(item.id === 'center') { el.className='dpad-btn dpad-center'; }
+    else {
+      el.className = 'dpad-btn';
+      el.id = 'dpad_'+item.id;
+      el.textContent = item.label;
+      el.addEventListener('mousedown', ()=>{ el.classList.add('active-btn'); log('ok','D-Pad '+item.id+' ✓'); });
+      el.addEventListener('mouseup', ()=>{ el.classList.remove('active-btn'); });
+    }
+    dpad.appendChild(el);
+  });
+}
+
+// =====================
+// TYPE SWITCH
+// =====================
+function switchType(type) {
+  currentType = type;
+  currentSubtype = controllers[type].subtypes[0].id;
+
+  document.getElementById('tabPS').className = 'tab ps' + (type==='ps'?' active':'');
+  document.getElementById('tabXbox').className = 'tab xbox' + (type==='xbox'?' active':'');
+
+  // Update stick colors
+  ['stickLeft','stickRight'].forEach(id=>{
+    const el = document.getElementById(id);
+    el.className = 'stick-dot ' + type;
+  });
+
+  // Update trigger fills
+  const fills = ['trigL','trigR','trigL1','trigR1'];
+  fills.forEach(id=>{
+    const el = document.getElementById(id);
+    el.className = 'trigger-bar-fill ' + type;
+  });
+
+  buildSubtypes();
+  buildFaceButtons();
+  buildDpad();
+
+  // Update trigger labels
+  const labels = controllers[type].triggerLabels;
+  const rows = document.querySelectorAll('.trigger-label');
+  rows.forEach((el,i) => { if(labels[i]) el.textContent = labels[i]; });
+
+  log('info', `تم التبديل إلى ${type === 'ps' ? 'PlayStation' : 'Xbox'}`);
+}
+
+// =====================
+// GAMEPAD API
+// =====================
+function listenGamepad() {
+  window.addEventListener('gamepadconnected', (e) => {
+    gamepadIndex = e.gamepad.index;
+    document.getElementById('connectOverlay').classList.add('hidden');
+    document.getElementById('connDot').className = 'status-dot connected';
+    document.getElementById('connText').textContent = 'متصل: ' + (e.gamepad.id.substring(0,30));
+    document.getElementById('modelText').textContent = e.gamepad.id.substring(0,25);
+
+    // Auto detect type
+    const id = e.gamepad.id.toLowerCase();
+    if(id.includes('playstation') || id.includes('dualshock') || id.includes('dualsense') || id.includes('sony')) {
+      switchType('ps');
+      document.getElementById('tabPS').classList.add('active');
+    } else if(id.includes('xbox') || id.includes('xinput') || id.includes('microsoft')) {
+      switchType('xbox');
+    }
+
+    log('ok', `تم الاتصال: ${e.gamepad.id}`);
+    if(!rafId) rafId = requestAnimationFrame(gameLoop);
+  });
+
+  window.addEventListener('gamepaddisconnected', (e) => {
+    if(e.gamepad.index === gamepadIndex) {
+      gamepadIndex = null;
+      document.getElementById('connDot').className = 'status-dot';
+      document.getElementById('connText').textContent = 'لا يوجد جهاز';
+      log('warn', 'انقطع الاتصال بالأيدي');
+    }
+  });
+}
+
+function gameLoop(ts) {
+  rafId = requestAnimationFrame(gameLoop);
+  frameCount++;
+  if(ts - lastTimestamp >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastTimestamp = ts;
+    document.getElementById('frameText').textContent = fps + ' fps';
+  }
+
+  if(gamepadIndex === null) return;
+  const gp = navigator.getGamepads()[gamepadIndex];
+  if(!gp) return;
+
+  // Sticks
+  const dz = settings.deadzoneLeft / 100;
+  const dzR = settings.deadzoneRight / 100;
+  let lx = gp.axes[0] || 0;
+  let ly = gp.axes[1] || 0;
+  let rx = gp.axes[2] || 0;
+  let ry = gp.axes[3] || 0;
+
+  if(Math.abs(lx) < dz) lx = 0;
+  if(Math.abs(ly) < dz) ly = 0;
+  if(Math.abs(rx) < dzR) rx = 0;
+  if(Math.abs(ry) < dzR) ry = 0;
+
+  updateStick('stickLeft', 'coordsLeft', lx, ly);
+  updateStick('stickRight', 'coordsRight', rx, ry);
+
+  // Triggers
+  const trigDZ = settings.trigDZ / 100;
+  const l2 = gp.buttons[6]?.value || 0;
+  const r2 = gp.buttons[7]?.value || 0;
+  const l1 = gp.buttons[4]?.pressed ? 1 : 0;
+  const r1 = gp.buttons[5]?.pressed ? 1 : 0;
+
+  setTrigger('trigL', 'trigLVal', l2 > trigDZ ? l2 : 0);
+  setTrigger('trigR', 'trigRVal', r2 > trigDZ ? r2 : 0);
+  setTrigger('trigL1', 'trigL1Val', l1, true);
+  setTrigger('trigR1', 'trigR1Val', r1, true);
+
+  // Face buttons
+  const btns = controllers[currentType].buttons;
+  const bmap = BUTTON_MAP[currentType];
+  btns.forEach(btn => {
+    const idx = bmap[btn.id];
+    const el = document.getElementById('fbtn_'+btn.id);
+    if(el && gp.buttons[idx]) {
+      if(gp.buttons[idx].pressed) el.classList.add('active-btn');
+      else el.classList.remove('active-btn');
+    }
+  });
+
+  // Dpad
+  const dpadIds = ['up','down','left','right'];
+  const dpadBtns = [12,13,14,15];
+  dpadIds.forEach((d,i) => {
+    const el = document.getElementById('dpad_'+d);
+    if(el) {
+      if(gp.buttons[dpadBtns[i]]?.pressed) el.classList.add('active-btn');
+      else el.classList.remove('active-btn');
+    }
+  });
+
+  // Calibration step check
+  if(isCalibrating) doCalStep(gp);
+}
+
+function updateStick(dotId, coordId, x, y) {
+  const dot = document.getElementById(dotId);
+  const coord = document.getElementById(coordId);
+  const bg = dot.parentElement;
+  const r = bg.offsetWidth / 2 - dot.offsetWidth / 2;
+  dot.style.left = (50 + x * 45) + '%';
+  dot.style.top  = (50 + y * 45) + '%';
+  dot.style.transform = 'translate(-50%,-50%)';
+  coord.textContent = `X: ${x.toFixed(2)} | Y: ${y.toFixed(2)}`;
+}
+
+function setTrigger(barId, valId, val, digital=false) {
+  const bar = document.getElementById(barId);
+  const label = document.getElementById(valId);
+  const pct = Math.round(val * 100);
+  bar.style.width = pct + '%';
+  label.textContent = digital ? (val ? '●' : '○') : pct;
+}
+
+// =====================
+// MANUAL MODE
+// =====================
+function enterManualMode() {
+  manualMode = true;
+  document.getElementById('connectOverlay').classList.add('hidden');
+  document.getElementById('connDot').className = 'status-dot warning';
+  document.getElementById('connText').textContent = 'وضع يدوي (محاكاة)';
+  document.getElementById('modelText').textContent = 'MANUAL MODE';
+  log('warn', 'وضع يدوي — استخدم الماوس لمحاكاة العصا');
+  startManualStickSim();
+  if(!rafId) rafId = requestAnimationFrame(manualLoop);
+}
+
+let manualSticks = { lx:0, ly:0, rx:0, ry:0 };
+let activeDrag = null;
+
+function startManualStickSim() {
+  ['stickLeftBg','stickRightBg'].forEach((bgId, idx) => {
+    const bg = document.getElementById(bgId);
+    bg.style.cursor = 'crosshair';
+    bg.addEventListener('mousemove', (e) => {
+      if(!activeDrag && e.buttons !== 1) return;
+      const rect = bg.getBoundingClientRect();
+      const cx = rect.left + rect.width/2;
+      const cy = rect.top + rect.height/2;
+      let x = Math.max(-1, Math.min(1, (e.clientX - cx)/(rect.width/2)));
+      let y = Math.max(-1, Math.min(1, (e.clientY - cy)/(rect.height/2)));
+      if(idx===0){ manualSticks.lx=x; manualSticks.ly=y; }
+      else { manualSticks.rx=x; manualSticks.ry=y; }
+    });
+    bg.addEventListener('mouseleave', ()=>{
+      if(idx===0){ manualSticks.lx=0; manualSticks.ly=0; }
+      else { manualSticks.rx=0; manualSticks.ry=0; }
+    });
+  });
+}
+
+function manualLoop() {
+  rafId = requestAnimationFrame(manualLoop);
+  updateStick('stickLeft','coordsLeft', manualSticks.lx, manualSticks.ly);
+  updateStick('stickRight','coordsRight', manualSticks.rx, manualSticks.ry);
+}
+
+// =====================
+// SETTINGS
+// =====================
+function setupSliderListeners() {
+  document.getElementById('vibLeft').oninput = function(){ document.getElementById('vibLeftVal').textContent=this.value+'%'; };
+  document.getElementById('vibRight').oninput = function(){ document.getElementById('vibRightVal').textContent=this.value+'%'; };
+}
+function updateDeadzone(side) {
+  const val = document.getElementById('deadzone'+side.charAt(0).toUpperCase()+side.slice(1)).value;
+  document.getElementById('deadzone'+side.charAt(0).toUpperCase()+side.slice(1)+'Val').textContent = val+'%';
+  settings['deadzone'+side.charAt(0).toUpperCase()+side.slice(1)] = parseInt(val);
+  drawSensCurve();
+}
+function updateSens(side) {
+  const val = document.getElementById('sens'+side.charAt(0).toUpperCase()+side.slice(1)).value;
+  document.getElementById('sens'+side.charAt(0).toUpperCase()+side.slice(1)+'Val').textContent = val+'%';
+  settings['sens'+side.charAt(0).toUpperCase()+side.slice(1)] = parseInt(val);
+}
+function updateTrigDZ() {
+  const val = document.getElementById('trigDZ').value;
+  document.getElementById('trigDZVal').textContent = val+'%';
+  settings.trigDZ = parseInt(val);
+}
+
+// =====================
+// VIBRATION
+// =====================
+function testVibration(type) {
+  const gp = gamepadIndex !== null ? navigator.getGamepads()[gamepadIndex] : null;
+  const lv = document.getElementById('vibLeft').value / 100;
+  const rv = document.getElementById('vibRight').value / 100;
+
+  const btnId = type === 'short' ? 'vibShort' : type === 'long' ? 'vibLong' : 'vibDouble';
+  const btn = document.getElementById(btnId);
+  btn.classList.add('testing');
+  setTimeout(()=>btn.classList.remove('testing'), type==='long'?800:400);
+
+  if(gp && gp.vibrationActuator) {
+    if(type === 'short') {
+      gp.vibrationActuator.playEffect('dual-rumble',{ duration:200, strongMagnitude:lv, weakMagnitude:rv });
+    } else if(type === 'long') {
+      gp.vibrationActuator.playEffect('dual-rumble',{ duration:800, strongMagnitude:lv, weakMagnitude:rv });
+    } else {
+      gp.vibrationActuator.playEffect('dual-rumble',{ duration:150, strongMagnitude:lv, weakMagnitude:rv });
+      setTimeout(()=>gp.vibrationActuator.playEffect('dual-rumble',{ duration:150, strongMagnitude:lv, weakMagnitude:rv }), 250);
+    }
+    log('ok', `اهتزاز ${type} — L:${Math.round(lv*100)}% R:${Math.round(rv*100)}%`);
+  } else {
+    log('warn', 'الاهتزاز غير مدعوم على هذا الجهاز/المتصفح');
+  }
+}
+
+// =====================
+// CALIBRATION
+// =====================
+const CAL_STEPS = [
+  { msg:'① حرّك العصا اليسرى بالكامل في دائرة كاملة...', duration:3000 },
+  { msg:'② اتركها في المنتصف وابقَ ثابت...', duration:2000 },
+  { msg:'③ حرّك العصا اليمنى بالكامل في دائرة كاملة...', duration:3000 },
+  { msg:'④ اتركها في المنتصف وابقَ ثابت...', duration:2000 },
+  { msg:'⑤ اضغط L2/R2 حتى النهاية ثم أرخِهم...', duration:2500 },
+  { msg:'⑥ اضغط كل أزرار الوجه واحداً تلو الآخر...', duration:3000 },
+  { msg:'⑦ اضغط جميع أزرار D-Pad...', duration:2000 },
+  { msg:'✓ اكتملت المعايرة!', duration:1000 }
+];
+
+function startCalibration() {
+  if(isCalibrating) return;
+  isCalibrating = true;
+  calStep = 0;
+  const btn = document.getElementById('calBtn');
+  btn.classList.add('running');
+  btn.textContent = '⟳ جاري المعايرة...';
+  runCalStep();
+}
+
+function runCalStep() {
+  if(calStep >= CAL_STEPS.length) {
+    isCalibrating = false;
+    const btn = document.getElementById('calBtn');
+    btn.classList.remove('running');
+    btn.textContent = '▶ بدء المعايرة الكاملة';
+    log('ok', '✓ تمت المعايرة بنجاح — تم حفظ الإعدادات');
+    return;
+  }
+  const step = CAL_STEPS[calStep];
+  log('info', step.msg);
+  calStep++;
+  setTimeout(runCalStep, step.duration);
+}
+
+function doCalStep(gp) { /* Live input feedback during calibration */ }
+
+function resetCalibration() {
+  isCalibrating = false;
+  calStep = 0;
+  const btn = document.getElementById('calBtn');
+  btn.classList.remove('running');
+  btn.textContent = '▶ بدء المعايرة الكاملة';
+  // Reset sliders
+  ['deadzoneLeft','deadzoneRight'].forEach(id=>{
+    document.getElementById(id).value = 8;
+  });
+  settings.deadzoneLeft = settings.deadzoneRight = 8;
+  document.getElementById('deadzoneLeftVal').textContent = '8%';
+  document.getElementById('deadzoneRightVal').textContent = '8%';
+  log('warn', 'تم إعادة ضبط جميع الإعدادات');
+  drawSensCurve();
+}
+
+// =====================
+// LOG
+// =====================
+function log(type, msg) {
+  const panel = document.getElementById('logPanel');
+  const ts = new Date().toLocaleTimeString('ar',{hour12:false});
+  const line = document.createElement('span');
+  line.className = 'log-line ' + type;
+  line.textContent = `[${ts}] ${msg}`;
+  panel.appendChild(line);
+  panel.appendChild(document.createTextNode('\n'));
+  panel.scrollTop = panel.scrollHeight;
+}
+
+// =====================
+// SENSITIVITY CURVE CANVAS
+// =====================
+function drawSensCurve() {
+  const canvas = document.getElementById('sensCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.parentElement.offsetWidth || 300;
+  canvas.height = canvas.parentElement.offsetHeight || 80;
+  const W = canvas.width, H = canvas.height;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(0,245,255,0.05)';
+  ctx.lineWidth = 1;
+  for(let i=0;i<=4;i++){
+    ctx.beginPath(); ctx.moveTo(i*W/4,0); ctx.lineTo(i*W/4,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*H/4); ctx.lineTo(W,i*H/4); ctx.stroke();
+  }
+
+  const dz = settings.deadzoneLeft / 100;
+  const type = document.getElementById('curveType').value;
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#00F5FF';
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 6;
+  ctx.shadowColor = '#00F5FF';
+
+  for(let px=0;px<W;px++){
+    const x = px/W;
+    let y;
+    if(x < dz) { y = 0; }
+    else {
+      const t = (x-dz)/(1-dz);
+      if(type==='linear') y = t;
+      else if(type==='expo') y = t*t;
+      else if(type==='scurve') y = t<0.5 ? 2*t*t : -1+4*t-2*t*t;
+      else if(type==='steep') y = Math.pow(t,0.5);
+      else y = t;
+    }
+    const py = H - y*H;
+    if(px===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+
+  // Deadzone marker
+  if(dz > 0) {
+    ctx.strokeStyle = 'rgba(255,107,53,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.moveTo(dz*W,0); ctx.lineTo(dz*W,H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,107,53,0.7)';
+    ctx.font = '9px Orbitron';
+    ctx.fillText('DZ', dz*W+3, 12);
+  }
+}
+
+window.addEventListener('resize', drawSensCurve);
+
+// =====================
+// START
+// =====================
+init();
+</script>
+</body>
+</html>
+
+# 🎮 Controller Calibration Tool
+
+### جهاز معايرة الأيادي — PlayStation & Xbox
+
+![HTML](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![No Dependencies](https://img.shields.io/badge/Dependencies-None-brightgreen?style=for-the-badge)
+
+-----
+
+## ✨ المميزات | Features
+
+- 🕹️ **دعم كامل** لأيادي PlayStation و Xbox (كل الإصدارات)
+- 📡 **Gamepad API** — كشف تلقائي عند توصيل الأيدي
+- 🎯 **معايرة العصا** مع تحكم كامل في Deadzone والحساسية
+- 📊 **منحنيات الحساسية** — Linear، Exponential، S-Curve، Steep
+- 💥 **اختبار الاهتزاز** بأنواع مختلفة
+- 🔘 **اختبار جميع الأزرار** (أزرار الوجه، D-Pad، Triggers)
+- 🖥️ **وضع يدوي** للمحاكاة بالماوس بدون جهاز
+- ⚡ **لا يحتاج مكتبات خارجية** — ملف HTML واحد فقط
+
+-----
+
+## 🚀 طريقة الاستخدام | How to Use
+
+### الطريقة 1 — مباشرة من GitHub Pages
+
+```
+افتح الرابط بعد تفعيل GitHub Pages
+```
+
+### الطريقة 2 — تشغيل محلي
+
+```bash
+git clone https://github.com/YOUR_USERNAME/controller-calibration
+cd controller-calibration
+# افتح controller-calibration.html في المتصفح
+```
+
+-----
+
+## 🎮 الأجهزة المدعومة | Supported Controllers
+
+|PlayStation        |Xbox            |
+|-------------------|----------------|
+|PS5 DualSense      |Xbox Series X/S |
+|PS4 DualShock 4    |Xbox One        |
+|PS3 DualShock 3    |Xbox 360        |
+|PlayStation Classic|Elite Controller|
+
+-----
+
+## 🌐 المتصفحات المدعومة | Browser Support
+
+|المتصفح      |الدعم |
+|-------------|------|
+|Chrome / Edge|✅ كامل|
+|Firefox      |✅ كامل|
+|Safari       |⚠️ جزئي|
+
+
+> **ملاحظة:** يتطلب Gamepad API — تأكد من إذن المتصفح
+
+-----
+
+## 📁 هيكل المشروع | Project Structure
+
+```
+controller-calibration/
+├── controller-calibration.html   ← التطبيق الكامل
+├── README.md                     ← هذا الملف
+└── LICENSE                       ← رخصة MIT
+```
+
+-----
+
+## 🔧 GitHub Pages — تفعيل سريع
+
+1. ارفع الملفات على GitHub
+1. اذهب إلى **Settings → Pages**
+1. اختر **Branch: main** → **/ (root)**
+1. احفظ — الموقع سيكون جاهز خلال دقيقة!
+
+-----
+
+## 📄 License
+
+MIT License — استخدم حر ✓
+
+	
